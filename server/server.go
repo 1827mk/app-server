@@ -15,7 +15,7 @@ import (
 type Server struct {
 	Echo     *echo.Echo
 	Cfg      *conf.Config
-	Database *datastore.GORMDB
+	Database *datastore.DBStore
 	Redis    *datastore.RedisClient
 }
 
@@ -57,7 +57,7 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 	server := &Server{
 		Echo:     e,
 		Cfg:      cfg,
-		Database: db,
+		Database: &datastore.DBStore{DB: db},
 		Redis:    rdb,
 	}
 

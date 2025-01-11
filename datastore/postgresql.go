@@ -1,10 +1,10 @@
 package datastore
 
 import (
+	"database/sql"
 	"fmt"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	_ "github.com/lib/pq"
 )
 
 type DBConfig struct {
@@ -15,20 +15,25 @@ type DBConfig struct {
 	DBName   string
 }
 
-type GORMDB struct {
-	DB *gorm.DB
+type DBStore struct {
+	DB *sql.DB
 }
 
-func NewPostgresDB(cfg *DBConfig) (*GORMDB, error) {
+func NewPostgresDB(cfg *DBConfig) (*sql.DB, error) {
+	// Construct the connection string
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
+	// Open a connection to the database
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	// Auto migrate schemas if needed
-	// db.AutoMigrate(&YourModel{})
+	// Verify the connection is valid
+	if err = db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
 
-	return &GORMDB{DB: db}, nil
+	return db, nil
 }
