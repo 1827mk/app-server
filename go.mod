@@ -3,7 +3,7 @@ module github.com/1827mk/app-server
 go 1.23.4
 
 require (
-	github.com/1827mk/app-commons v0.0.0-20250111100727-4712e53e41dd
+	github.com/1827mk/app-commons v0.0.2
 	github.com/labstack/echo-jwt/v4 v4.3.0
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/lib/pq v1.10.9
@@ -40,7 +40,6 @@ require (
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
