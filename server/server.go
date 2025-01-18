@@ -27,6 +27,7 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 		User:     cfg.Database.User,
 		Password: cfg.Database.Password,
 		DBName:   cfg.Database.DBName,
+		Scripts:  cfg.Database.Scripts,
 	})
 	if err != nil {
 		return nil, err
