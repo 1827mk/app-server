@@ -3,7 +3,7 @@ module github.com/1827mk/app-server
 go 1.23.4
 
 require (
-	github.com/1827mk/app-commons v0.0.2
+	github.com/1827mk/app-commons v0.0.4
 	github.com/labstack/echo-jwt/v4 v4.3.0
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/lib/pq v1.10.9
