@@ -59,7 +59,7 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 	// Configure JWT middleware
 	jwtConfig := echojwt.Config{
 		SigningKey:    []byte(cfg.JWT.Secret),
-		TokenLookup:   "header:Authorization",
+		TokenLookup:   "header:Authorization:Bearer",
 		SigningMethod: "HS256",
 		ContextKey:    "user",
 		NewClaimsFunc: func(c echo.Context) jwt.Claims {
@@ -150,6 +150,7 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 
 	return server, nil
 }
+
 func (s *Server) Start() error {
 	return s.Echo.Start(fmt.Sprintf(":%v", s.Cfg.Server.Port))
 }
