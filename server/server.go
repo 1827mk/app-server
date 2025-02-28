@@ -66,23 +66,22 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 			return new(mid.JWTCustomClaims)
 		},
 		Skipper: func(c echo.Context) bool {
-			publicPaths := []string{
-				"/api/v1/auth/login",
-				"/api/v1/auth/register",
-				"/api/v1/auth/refresh",
-				"/api/v1/auth/forgot-password",
-				"/api/v1/auth/reset-password",
-				"/health",
-				"/metrics",
+			publicPaths := map[string]struct{}{
+				"/api/v1/auth/login":           {},
+				"/api/v1/auth/register":        {},
+				"/api/v1/auth/refresh":         {},
+				"/api/v1/auth/forgot-password": {},
+				"/api/v1/auth/reset-password":  {},
+				"/health":                      {},
+				"/metrics":                     {},
 			}
 
 			path := c.Path()
-			for _, p := range publicPaths {
-				if path == p {
-					return true
-				}
+			_, ok := publicPaths[path]
+			if ok {
+				c.Logger().Infof("Skipping JWT authentication for: %s", path)
 			}
-			return false
+			return ok
 		},
 		ErrorHandler: func(c echo.Context, err error) error {
 			if err.Error() == "Missing or malformed JWT" {
