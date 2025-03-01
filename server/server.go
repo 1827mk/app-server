@@ -7,10 +7,12 @@ import (
 
 	"github.com/1827mk/app-commons/conf"
 	"github.com/1827mk/app-server/datastore"
+	"github.com/1827mk/app-server/logger"
 	"github.com/golang-jwt/jwt/v5"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
 
@@ -28,6 +30,9 @@ type JWTClaims struct {
 	Role     string `json:"role"`
 	jwt.RegisteredClaims
 }
+
+// Pre-configured logger
+var log *zap.Logger
 
 func NewServer(cfg *conf.Config) (*Server, error) {
 	e := echo.New()
@@ -58,10 +63,19 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 	}
 
 	// Basic middleware
-	e.Use(middleware.Logger())
+	//e.Use(middleware.Logger())
+	e.Use(logger.ZapLoggerMiddleware(log))
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())
 	e.Use(middleware.RequestID())
+
+	// Make logger available in context
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Set("logger", log)
+			return next(c)
+		}
+	})
 
 	// Configure JWT middleware
 	configureJWTMiddleware(e, cfg)
