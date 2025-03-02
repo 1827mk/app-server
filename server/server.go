@@ -3,11 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/1827mk/app-commons/conf"
 	"github.com/1827mk/app-server/datastore"
 	"github.com/1827mk/app-server/logger"
+	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
@@ -102,6 +104,7 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 			},
 		}))
 	}
+	e.Validator = &ServiceValidator{validator: validator.New()}
 
 	// Initialize server with all components
 	server := &Server{
@@ -263,6 +266,17 @@ func (s *Server) RevokeRefreshToken(userID uint) error {
 	err := s.Redis.Client.Del(ctx, fmt.Sprintf("refresh_token:%d", userID)).Err()
 	if err != nil {
 		return fmt.Errorf("failed to revoke refresh token: %w", err)
+	}
+	return nil
+}
+
+type ServiceValidator struct {
+	validator *validator.Validate
+}
+
+func (cv *ServiceValidator) Validate(i interface{}) error {
+	if err := cv.validator.Struct(i); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return nil
 }
