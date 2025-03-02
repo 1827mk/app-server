@@ -2,8 +2,11 @@ package logger
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"runtime"
+	"strings"
 	"time"
 
 	custom_response "github.com/1827mk/app-commons/app_response"
@@ -52,8 +55,40 @@ func Logger() *zap.Logger {
 	return log
 }
 
+func GetServiceErrorLocation() string {
+	stacktrace := make([]uintptr, 50)
+	length := runtime.Callers(3, stacktrace[:])
+	frames := runtime.CallersFrames(stacktrace[:length])
+
+	var locations []string
+	for {
+		frame, more := frames.Next()
+		if !more {
+			break
+		}
+
+		// Skip common framework and runtime paths
+		if strings.Contains(frame.File, "runtime/") ||
+			strings.Contains(frame.File, "/go/pkg/mod/") ||
+			strings.Contains(frame.File, "vendor/") {
+			continue
+		}
+
+		// Get relative path from project root
+		if projectPath := strings.Index(frame.File, "super-app"); projectPath != -1 {
+			relativePath := frame.File[projectPath:]
+			locations = append(locations, fmt.Sprintf("%s:%d", relativePath, frame.Line))
+		}
+	}
+
+	// Return the most relevant location or unknown
+	if len(locations) > 0 {
+		return locations[0]
+	}
+	return "unknown location"
+}
+
 func ZapLoggerMiddleware(log *zap.Logger) echo.MiddlewareFunc {
-	// Check if logger is nil and use default logger if it is
 	if log == nil {
 		log = Logger()
 	}
@@ -62,42 +97,57 @@ func ZapLoggerMiddleware(log *zap.Logger) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			start := time.Now()
 
+			defer func() {
+				if r := recover(); r != nil {
+					err, ok := r.(error)
+					if !ok {
+						err = fmt.Errorf("%v", r)
+					}
+
+					errorLocation := GetServiceErrorLocation()
+
+					// Log with service-specific location
+					log.Error("Service error occurred",
+						zap.String("service", "isync-service"),
+						zap.String("location", errorLocation),
+						zap.String("error", err.Error()),
+						zap.String("method", c.Request().Method),
+						zap.String("path", c.Request().URL.Path),
+					)
+
+					c.JSON(http.StatusInternalServerError, ErrorResponse{
+						Success: false,
+						Errors: []map[string]string{{
+							"code":     "internal_error",
+							"message":  "Internal server error",
+							"location": errorLocation,
+						}},
+						Message: "An unexpected error occurred",
+					})
+				}
+			}()
+
 			err := next(c)
 
+			// Log the request
 			req := c.Request()
 			res := c.Response()
 
 			fields := []zap.Field{
 				zap.String("method", req.Method),
 				zap.String("path", req.URL.Path),
-				zap.String("remote_ip", c.RealIP()),
 				zap.Int("status", res.Status),
-				zap.Int64("size", res.Size),
-				zap.String("user_agent", req.UserAgent()),
 				zap.Duration("latency", time.Since(start)),
 			}
 
-			id := req.Header.Get(echo.HeaderXRequestID)
-			if id == "" {
-				id = res.Header().Get(echo.HeaderXRequestID)
-			}
-			if id != "" {
-				fields = append(fields, zap.String("request_id", id))
+			if err != nil {
+				fields = append(fields, zap.Error(err))
+				log.Error("Request failed", fields...)
+				return err
 			}
 
-			n := res.Status
-			switch {
-			case n >= 500:
-				log.Error("Server error", fields...)
-			case n >= 400:
-				log.Warn("Client error", fields...)
-			case n >= 300:
-				log.Info("Redirection", fields...)
-			default:
-				log.Info("Success", fields...)
-			}
-
-			return err
+			log.Info("Request completed", fields...)
+			return nil
 		}
 	}
 }

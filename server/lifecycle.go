@@ -27,8 +27,4 @@ func (s *Server) Run() {
 	if err := s.Stop(ctx); err != nil {
 		s.Echo.Logger.Fatalf("shutting down the server: %v", err)
 	}
-
-	// if err := logger.Sync(); err != nil {
-	// 	zap.L().Error("Failed to sync zap logger", zap.Error(err))
-	// }
 }

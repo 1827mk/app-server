@@ -78,7 +78,7 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 	// Basic middleware
 	log := logger.Logger()
 	e.Use(logger.ZapLoggerMiddleware(log))
-	e.Use(middleware.Recover())
+	e.Use(CustomRecover())
 	e.Use(middleware.CORS())
 	e.Use(middleware.RequestID())
 
@@ -126,6 +126,34 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 	}
 
 	return server, nil
+}
+
+func CustomRecover() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			defer func() {
+				if r := recover(); r != nil {
+					err, ok := r.(error)
+					if !ok {
+						err = echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
+					}
+					errorLocation := logger.GetServiceErrorLocation()
+					// Log error with location
+					logger.Error("Panic recovered",
+						zap.String("location", errorLocation),
+						logger.WithError(err),
+					)
+
+					// Send clean response to client
+					c.JSON(http.StatusInternalServerError, map[string]interface{}{
+						"success": false,
+						"message": "Internal server error",
+					})
+				}
+			}()
+			return next(c)
+		}
+	}
 }
 
 // configureJWTMiddleware sets up the JWT middleware
@@ -280,17 +308,6 @@ func (s *Server) RevokeRefreshToken(userID uint) error {
 	}
 	return nil
 }
-
-// type ServiceValidator struct {
-// 	validator *validator.Validate
-// }
-
-// func (cv *ServiceValidator) Validate(i interface{}) error {
-// 	if err := cv.validator.Struct(i); err != nil {
-// 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-// 	}
-// 	return nil
-// }
 
 func (s *Server) Start() error {
 	return s.Echo.Start(fmt.Sprintf(":%v", s.Cfg.Server.Port))
