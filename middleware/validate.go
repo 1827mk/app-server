@@ -16,13 +16,19 @@ type CustomBinder struct {
 func (cb *CustomBinder) Bind(i interface{}, c echo.Context) error {
 	// Call the default binder
 	if err := cb.DefaultBinder.Bind(i, c); err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusBadRequest, map[string]interface{}{
+			"message": "Invalid request format",
+			"error":   err.Error(),
+		})
 	}
 
 	// Run Echo's validator if configured
 	if c.Echo().Validator != nil {
 		if err := c.Echo().Validator.Validate(i); err != nil {
-			return err
+			return echo.NewHTTPError(http.StatusBadRequest, map[string]interface{}{
+				"message": "Validation failed",
+				"error":   err.Error(),
+			})
 		}
 	}
 
@@ -31,9 +37,15 @@ func (cb *CustomBinder) Bind(i interface{}, c echo.Context) error {
 		if err := validator.Validate(); err != nil {
 			// Handle custom_response.Errors properly
 			if errs, ok := err.(*custom_response.Errors); ok {
-				return echo.NewHTTPError(http.StatusBadRequest, errs.ToMap())
+				return echo.NewHTTPError(http.StatusBadRequest, map[string]interface{}{
+					"message": "Validation failed",
+					"errors":  errs.Error(),
+				})
 			}
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+			return echo.NewHTTPError(http.StatusBadRequest, map[string]interface{}{
+				"message": "Validation failed",
+				"error":   err.Error(),
+			})
 		}
 	}
 

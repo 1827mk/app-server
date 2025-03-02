@@ -6,60 +6,48 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
-// Pre-configured logger
 var log *zap.Logger
 
 func init() {
-	config := zap.Config{
-		Encoding:         "json",                               // Use JSON encoding for structured logging
-		Level:            zap.NewAtomicLevelAt(zap.InfoLevel),  // Default logging level
-		OutputPaths:      []string{"stdout", "logs/app.log"},   // Output to console and file
-		ErrorOutputPaths: []string{"stderr", "logs/error.log"}, // Error output paths
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:       "timestamp",
-			LevelKey:      "level",
-			NameKey:       "logger",
-			CallerKey:     "caller",
-			FunctionKey:   zapcore.OmitKey,
-			MessageKey:    "message",
-			StacktraceKey: "stacktrace",
-			LineEnding:    zapcore.DefaultLineEnding,
-			EncodeLevel:   zapcore.CapitalLevelEncoder,
-			EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-				enc.AppendString(t.Format(time.RFC3339))
-			},
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		InitialFields: map[string]interface{}{
-			"app": "super-app",
-		},
-	}
-
 	// Create logs directory if it doesn't exist
 	err := os.MkdirAll("logs", 0755)
 	if err != nil {
 		panic(err)
 	}
 
-	// Build the logger
+	config := zap.Config{
+		Encoding:         "json",
+		Level:            zap.NewAtomicLevelAt(zap.InfoLevel),
+		OutputPaths:      []string{"stdout", "logs/app.log"},
+		ErrorOutputPaths: []string{"stderr", "logs/error.log"},
+		EncoderConfig:    zap.NewProductionEncoderConfig(),
+		InitialFields: map[string]interface{}{
+			"app": "super-app",
+		},
+	}
+
 	log, err = config.Build(
 		zap.AddCaller(),
 		zap.AddCallerSkip(1),
-		zap.AddStacktrace(zapcore.ErrorLevel),
 	)
 	if err != nil {
 		panic(err)
 	}
-
-	log.Info("Logger initialized successfully")
 }
 
-// Create a middleware to use the zap logger with Echo
+// Logger returns the global logger instance
+func Logger() *zap.Logger {
+	return log
+}
+
 func ZapLoggerMiddleware(log *zap.Logger) echo.MiddlewareFunc {
+	// Check if logger is nil and use default logger if it is
+	if log == nil {
+		log = Logger()
+	}
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			start := time.Now()
@@ -102,11 +90,4 @@ func ZapLoggerMiddleware(log *zap.Logger) echo.MiddlewareFunc {
 			return err
 		}
 	}
-}
-func Logger() *zap.Logger {
-	return log
-}
-
-func Sync() error {
-	return log.Sync()
 }

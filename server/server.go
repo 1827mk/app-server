@@ -64,7 +64,8 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 	}
 
 	// Basic middleware
-	//e.Use(middleware.Logger())
+	// Initialize logger
+	log := logger.Logger()
 	e.Use(logger.ZapLoggerMiddleware(log))
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())

@@ -7,10 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/1827mk/app-server/logger"
-
 	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 )
 
 func (s *Server) Run() {
@@ -31,7 +28,7 @@ func (s *Server) Run() {
 		s.Echo.Logger.Fatalf("shutting down the server: %v", err)
 	}
 
-	if err := logger.Sync(); err != nil {
-		zap.L().Error("Failed to sync zap logger", zap.Error(err))
-	}
+	// if err := logger.Sync(); err != nil {
+	// 	zap.L().Error("Failed to sync zap logger", zap.Error(err))
+	// }
 }
