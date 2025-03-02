@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 
+	custom_response "github.com/1827mk/app-commons/app_response"
 	"github.com/labstack/echo/v4"
 )
 
@@ -28,6 +29,10 @@ func (cb *CustomBinder) Bind(i interface{}, c echo.Context) error {
 	// Check if the struct has a Validate method and call it
 	if validator, ok := i.(interface{ Validate() error }); ok {
 		if err := validator.Validate(); err != nil {
+			// Handle custom_response.Errors properly
+			if errs, ok := err.(*custom_response.Errors); ok {
+				return echo.NewHTTPError(http.StatusBadRequest, errs.ToMap())
+			}
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	}
