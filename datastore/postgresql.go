@@ -17,35 +17,57 @@ type DBConfig struct {
 	Scripts  []string
 }
 
+type Store interface {
+	Validate() error
+	GetDB() *sql.DB
+}
+
 type DBStore struct {
 	DB *sql.DB
 }
 
-func NewPostgresDB(cfg *DBConfig) (*sql.DB, error) {
-	// Construct the connection string
+func NewPostgresDB(cfg *DBConfig) (*DBStore, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName)
 
-	// Open a connection to the database
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	// Verify the connection is valid
 	if err = db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// Run the init script if provided
 	if len(cfg.Scripts) > 0 {
-		err := runInitScripts(db, cfg.Scripts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to run init script: %w", err)
+		if err := runInitScripts(db, cfg.Scripts); err != nil {
+			return nil, fmt.Errorf("failed to run init scripts: %w", err)
 		}
 	}
 
-	return db, nil
+	return &DBStore{DB: db}, nil
+}
+
+func NewStore(dbStore *DBStore) (Store, error) {
+	if dbStore == nil || dbStore.DB == nil {
+		return nil, fmt.Errorf("invalid database connection")
+	}
+
+	return &DBStore{
+		DB: dbStore.DB,
+	}, nil
+}
+
+// Add required methods
+func (s *DBStore) Validate() error {
+	if s.DB == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+	return s.DB.Ping()
+}
+
+func (s *DBStore) GetDB() *sql.DB {
+	return s.DB
 }
 
 func runInitScripts(db *sql.DB, scripts []string) error {

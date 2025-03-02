@@ -9,13 +9,11 @@ import (
 	"github.com/1827mk/app-commons/conf"
 	"github.com/1827mk/app-server/datastore"
 	"github.com/1827mk/app-server/logger"
-	appMiddleware "github.com/1827mk/app-server/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
-	"golang.org/x/time/rate"
 )
 
 type Server struct {
@@ -54,6 +52,14 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 		return nil, fmt.Errorf("database initialization failed: %v", err)
 	}
 
+	// Create datastore
+	store, err := datastore.NewStore(&datastore.DBStore{
+		DB: db.DB,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create store: %v", err)
+	}
+
 	// Initialize Redis
 	rdb, err := datastore.NewRedisClient(&datastore.RedisConfig{
 		Addr:     cfg.Redis.Addr,
@@ -64,16 +70,21 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 		return nil, fmt.Errorf("redis initialization failed: %v", err)
 	}
 
-	e.HTTPErrorHandler = func(err error, c echo.Context) {
-		if he, ok := err.(*echo.HTTPError); ok {
-			c.JSON(he.Code, he.Message)
-		} else {
-			c.JSON(http.StatusInternalServerError, map[string]interface{}{
-				"success": false,
-				"message": "Internal server error",
-			})
-		}
+	//create redis
+	redis, err := datastore.NewRedis(rdb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create store: %v", err)
 	}
+
+	// Add middleware to inject store and secret key into context
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Set("store", store)
+			c.Set("redis", redis)
+			c.Set("secret_key", cfg.JWT.Secret)
+			return next(c)
+		}
+	})
 
 	// Basic middleware
 	log := logger.Logger()
@@ -93,35 +104,11 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 	// Configure JWT middleware
 	configureJWTMiddleware(e, cfg)
 
-	// Configure rate limiting if enabled
-	if cfg.Server.RateLimit {
-		e.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
-			Store: middleware.NewRateLimiterMemoryStoreWithConfig(
-				middleware.RateLimiterMemoryStoreConfig{
-					Rate:      rate.Limit(cfg.Auth.RateLimit.LoginAttempts),
-					Burst:     int(cfg.Auth.RateLimit.LoginAttempts),
-					ExpiresIn: time.Duration(cfg.Auth.RateLimit.WindowMinutes) * time.Minute,
-				},
-			),
-			IdentifierExtractor: func(ctx echo.Context) (string, error) {
-				return ctx.RealIP(), nil
-			},
-			ErrorHandler: func(ctx echo.Context, err error) error {
-				return ctx.JSON(429, map[string]interface{}{
-					"code":    429,
-					"message": "too many requests",
-					"error":   err.Error(),
-				})
-			},
-		}))
-	}
-	e.Binder = &appMiddleware.CustomBinder{DefaultBinder: &echo.DefaultBinder{}}
-
 	// Initialize server with all components
 	server := &Server{
 		Echo:     e,
 		Cfg:      cfg,
-		Database: &datastore.DBStore{DB: db},
+		Database: db,
 		Redis:    rdb,
 	}
 
