@@ -3,13 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/1827mk/app-commons/conf"
 	"github.com/1827mk/app-server/datastore"
 	"github.com/1827mk/app-server/logger"
-	"github.com/go-playground/validator/v10"
+	appMiddleware "github.com/1827mk/app-server/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
@@ -104,7 +103,7 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 			},
 		}))
 	}
-	e.Validator = &ServiceValidator{validator: validator.New()}
+	e.Binder = &appMiddleware.CustomBinder{DefaultBinder: &echo.DefaultBinder{}}
 
 	// Initialize server with all components
 	server := &Server{
@@ -270,16 +269,16 @@ func (s *Server) RevokeRefreshToken(userID uint) error {
 	return nil
 }
 
-type ServiceValidator struct {
-	validator *validator.Validate
-}
+// type ServiceValidator struct {
+// 	validator *validator.Validate
+// }
 
-func (cv *ServiceValidator) Validate(i interface{}) error {
-	if err := cv.validator.Struct(i); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	return nil
-}
+// func (cv *ServiceValidator) Validate(i interface{}) error {
+// 	if err := cv.validator.Struct(i); err != nil {
+// 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+// 	}
+// 	return nil
+// }
 
 func (s *Server) Start() error {
 	return s.Echo.Start(fmt.Sprintf(":%v", s.Cfg.Server.Port))
