@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/1827mk/app-commons/conf"
@@ -63,8 +64,18 @@ func NewServer(cfg *conf.Config) (*Server, error) {
 		return nil, fmt.Errorf("redis initialization failed: %v", err)
 	}
 
+	e.HTTPErrorHandler = func(err error, c echo.Context) {
+		if he, ok := err.(*echo.HTTPError); ok {
+			c.JSON(he.Code, he.Message)
+		} else {
+			c.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"success": false,
+				"message": "Internal server error",
+			})
+		}
+	}
+
 	// Basic middleware
-	// Initialize logger
 	log := logger.Logger()
 	e.Use(logger.ZapLoggerMiddleware(log))
 	e.Use(middleware.Recover())
